@@ -1,0 +1,61 @@
+<header class="header">
+  <div class="container">
+    <div class="nav-brand">
+      <a routerLink="/" class="brand-link">
+        <h1>BlogApp</h1>
+      </a>
+    </div>
+
+    <nav class="nav-menu" [class.nav-menu-open]="isMenuOpen">
+      <ul class="nav-list">
+        <li class="nav-item">
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="closeMenu()">
+            Home
+          </a>
+        </li>
+        <li class="nav-item">
+          <a routerLink="/posts" routerLinkActive="active" (click)="closeMenu()">
+            Posts
+          </a>
+        </li>
+        
+        <ng-container *ngIf="!currentUser">
+          <li class="nav-item">
+            <a routerLink="/login" routerLinkActive="active" (click)="closeMenu()">
+              Login
+            </a>
+          </li>
+          <li class="nav-item">
+            <a routerLink="/register" routerLinkActive="active" class="btn-primary" (click)="closeMenu()">
+              Register
+            </a>
+          </li>
+        </ng-container>
+
+        <ng-container *ngIf="currentUser">
+          <li class="nav-item dropdown">
+            <button class="user-menu-btn" (click)="toggleMenu()">
+              <img [src]="currentUser.avatar" [alt]="currentUser.username" class="user-avatar">
+              <span>{{ currentUser.username }}</span>
+              <svg class="dropdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div class="dropdown-menu" [class.show]="isMenuOpen">
+              <a routerLink="/dashboard" (click)="closeMenu()">Dashboard</a>
+              <a routerLink="/profile" (click)="closeMenu()">Profile</a>
+              <a routerLink="/my-posts" (click)="closeMenu()">My Posts</a>
+              <button (click)="logout()" class="logout-btn">Logout</button>
+            </div>
+          </li>
+        </ng-container>
+      </ul>
+    </nav>
+
+    <button class="mobile-menu-btn" (click)="toggleMenu()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+</header>
