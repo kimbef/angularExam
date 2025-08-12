@@ -2,58 +2,44 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.5.
 
-## Development server
+## Description
 
-To start a local development server, run:
+This is a Single Page Application (SPA) built with Angular, featuring a public area (accessible without login) and a private area (accessible after login). It includes dynamic content rendering, full CRUD functionalities for posts, client-side routing, user authentication, and REST API communication.
 
-```bash
-ng serve
-```
+## Functionalities
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+*   **Public Area:**
+    *   Home page
+    *   User Login and Registration
+    *   Public data listing (posts)
+    *   Post details view
+*   **Private Area (User Area - Requires Login):**
+    *   Dashboard
+    *   User Profile Management
+    *   User's Posts
+    *   Create Post
+    *   Edit Post
+*   **CRUD Operations:** Create, Read, Update, and Delete posts.
+*   **User Authentication:** Login, Registration, and persistent sessions.
 
-## Code scaffolding
+## Technologies and Libraries
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+*   Angular (latest stable version)
+*   TypeScript
+*   RxJS
+*   Angular Router
+*   Angular Forms
+*   Angular HttpClient
 
-```bash
-ng generate component component-name
-```
+## High-Level Application Architecture Overview
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The application follows a component-based architecture.
 
-```bash
-ng generate --help
-```
+*   **Components:** Each page and UI element is implemented as an Angular component.
+*   **Services:**
+    *   `AuthService`: Handles user authentication (login, registration, logout) and session management.
+    *   `PostService`: Manages data fetching and CRUD operations for posts.
+*   **Routing:** Angular Router is used for navigation between different pages. Route guards (`AuthGuard`, `GuestGuard`) are used to protect routes based on user authentication status.
+*   **Data Flow:** Components interact with services to fetch and update data. Observables are used for asynchronous data handling.
+*   **API Communication:** The application communicates with a mock REST API using `HttpClient`.
 
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

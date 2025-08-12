@@ -160,4 +160,8 @@ export class PostsComponent implements OnInit, OnDestroy {
     this.selectedCategory = '';
     this.filteredPosts = this.posts;
   }
+
+  trackByPostId(index: number, post: Post): string {
+    return post.id;
+  }
 }

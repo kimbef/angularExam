@@ -93,4 +93,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   retryLoad(): void {
     this.loadDashboardData();
   }
+
+  trackByPostId(index: number, post: Post): string {
+    return post.id;
+  }
 }
