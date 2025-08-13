@@ -13,7 +13,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css']
+  styleUrl: './home.component.css'
 })
 export class HomeComponent implements OnInit, OnDestroy {
   featuredPosts: Post[] = [];

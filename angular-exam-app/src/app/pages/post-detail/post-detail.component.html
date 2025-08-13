@@ -159,11 +159,41 @@
           <div class="comment-content">
             <div class="comment-header">
               <span class="comment-author">{{ comment.author.username }}</span>
-                              <span class="comment-date">{{ comment.createdAt | date:"MMM d, y" }}</span>
+              <span class="comment-date">{{ comment.createdAt | date:"MMM d, y" }}</span>
             </div>
             <p class="comment-text">{{ comment.content }}</p>
           </div>
         </div>
+      </div>
+
+      <!-- Add Comment Form -->
+      <div *ngIf="currentUser" class="add-comment-section">
+        <h4>Add a Comment</h4>
+        <form (ngSubmit)="submitComment()" class="comment-form">
+          <div class="form-group">
+            <textarea
+              [(ngModel)]="newComment"
+              name="comment"
+              class="comment-input"
+              placeholder="Share your thoughts..."
+              rows="3"
+              [disabled]="isSubmittingComment"
+              required
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="!newComment.trim() || isSubmittingComment"
+            [class.loading]="isSubmittingComment"
+          >
+            <span *ngIf="!isSubmittingComment">Post Comment</span>
+            <span *ngIf="isSubmittingComment" class="loading-content">
+              <div class="spinner"></div>
+              Posting...
+            </span>
+          </button>
+        </form>
       </div>
     </section>
   </article>

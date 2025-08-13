@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil, switchMap } from 'rxjs/operators';
 import { PostService } from '../../services/post.service';
@@ -11,7 +12,7 @@ import { User } from '../../models/user.interface';
 @Component({
   selector: 'app-post-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './post-detail.component.html',
   styleUrl: './post-detail.component.css'
 })
@@ -20,6 +21,8 @@ export class PostDetailComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   isLoading = true;
   error: string | null = null;
+  newComment = '';
+  isSubmittingComment = false;
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -126,6 +129,28 @@ export class PostDetailComponent implements OnInit, OnDestroy {
         });
         break;
     }
+  }
+
+  submitComment(): void {
+    if (!this.currentUser || !this.post || !this.newComment.trim()) {
+      return;
+    }
+
+    this.isSubmittingComment = true;
+    
+    this.postService.addComment(this.post.id, this.newComment.trim())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (updatedPost) => {
+          this.post = updatedPost;
+          this.newComment = '';
+          this.isSubmittingComment = false;
+        },
+        error: (error) => {
+          console.error('Error adding comment:', error);
+          this.isSubmittingComment = false;
+        }
+      });
   }
 
   retryLoad(): void {

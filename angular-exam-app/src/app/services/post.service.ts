@@ -197,6 +197,45 @@ export class PostService {
     });
   }
 
+  addComment(postId: string, content: string): Observable<Post> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
+    const allPosts = this.postsSubject.value;
+    const postIndex = allPosts.findIndex(p => p.id === postId);
+    
+    if (postIndex === -1) {
+      return throwError(() => new Error('Post not found'));
+    }
+
+    const newComment: Comment = {
+      id: Math.random().toString(36).substr(2, 9),
+      content: content,
+      author: {
+        id: currentUser.id,
+        username: currentUser.username,
+        avatar: currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`
+      },
+      postId: postId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const updatedPost = { ...allPosts[postIndex] };
+    updatedPost.comments = [...updatedPost.comments, newComment];
+
+    const updatedPosts = [...allPosts];
+    updatedPosts[postIndex] = updatedPost;
+    this.postsSubject.next(updatedPosts);
+
+    return new Observable(observer => {
+      observer.next(updatedPost);
+      observer.complete();
+    });
+  }
+
   private transformToPost(apiPost: any, apiUser: any): Post {
     return {
       id: apiPost.id.toString(),

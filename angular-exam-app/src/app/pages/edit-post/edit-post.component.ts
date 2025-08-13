@@ -14,7 +14,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './edit-post.component.html',
-  styleUrls: ['./edit-post.component.css']
+  styleUrl: './edit-post.component.css'
 })
 export class EditPostComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;

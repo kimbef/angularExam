@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -30,7 +30,8 @@ export class PostsComponent implements OnInit, OnDestroy {
 
   constructor(
     private postService: PostService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -164,5 +165,9 @@ export class PostsComponent implements OnInit, OnDestroy {
 
   trackByPostId(index: number, post: Post): string {
     return post.id;
+  }
+
+  goToPost(postId: string): void {
+    this.router.navigate(['/posts', postId]);
   }
 }

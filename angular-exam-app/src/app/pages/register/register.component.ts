@@ -12,7 +12,7 @@ import { RegisterRequest } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './register.component.html',
-  styleUrls: ['./register.component.css']
+  styleUrl: './register.component.css'
 })
 export class RegisterComponent implements OnInit, OnDestroy {
   registerForm: FormGroup;

@@ -12,7 +12,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './profile.component.html',
-  styleUrls: ['./profile.component.css']
+  styleUrl: './profile.component.css'
 })
 export class ProfileComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;

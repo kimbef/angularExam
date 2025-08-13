@@ -14,7 +14,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './create-post.component.html',
-  styleUrls: ['./create-post.component.css']
+  styleUrl: './create-post.component.css'
 })
 export class CreatePostComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
