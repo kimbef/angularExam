@@ -6,7 +6,7 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist/browser",
-        "buildCommand": "npm run build:vercel"
+        "buildCommand": "npm run vercel-build"
       }
     }
   ],
@@ -16,6 +16,9 @@
       "dest": "/index.html"
     }
   ],
+  "env": {
+    "NODE_ENV": "production"
+  },
   "headers": [
     {
       "source": "/(.*)",

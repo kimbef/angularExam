@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "build:vercel": "ng build --configuration production",
+    "vercel-build": "npx @angular/cli@19.2.5 build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
