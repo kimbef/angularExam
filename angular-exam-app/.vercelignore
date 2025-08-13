@@ -1,0 +1,9 @@
+node_modules
+.angular
+.vscode
+.git
+.gitignore
+README.md
+*.log
+.DS_Store
+Thumbs.db
