@@ -13,7 +13,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './post-detail.component.html',
-  styleUrls: ['./post-detail.component.css']
+  styleUrl: './post-detail.component.css'
 })
 export class PostDetailComponent implements OnInit, OnDestroy {
   post: Post | null = null;
@@ -102,6 +102,30 @@ export class PostDetailComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     this.router.navigate(['/posts']);
+  }
+
+  sharePost(platform: string): void {
+    if (!this.post) return;
+    
+    const url = window.location.href;
+    const title = this.post.title;
+    
+    switch (platform) {
+      case 'twitter':
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
+        window.open(twitterUrl, '_blank');
+        break;
+      case 'facebook':
+        const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        window.open(facebookUrl, '_blank');
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(url).then(() => {
+          // You could add a toast notification here
+          console.log('Link copied to clipboard');
+        });
+        break;
+    }
   }
 
   retryLoad(): void {

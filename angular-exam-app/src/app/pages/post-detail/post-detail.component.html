@@ -38,9 +38,9 @@
           <div class="author-info">
             <h3 class="author-name">{{ post.author.username }}</h3>
             <div class="post-date-info">
-              <span class="post-date">Published {{ post.createdAt | date:'MMMM d, y' }}</span>
+              <span class="post-date">Published {{ post.createdAt | date:"MMMM d, y" }}</span>
               <span *ngIf="post.updatedAt !== post.createdAt" class="post-updated">
-                • Updated {{ post.updatedAt | date:'MMM d, y' }}
+                                  • Updated {{ post.updatedAt | date:"MMM d, y" }}
               </span>
             </div>
           </div>
@@ -159,7 +159,7 @@
           <div class="comment-content">
             <div class="comment-header">
               <span class="comment-author">{{ comment.author.username }}</span>
-              <span class="comment-date">{{ comment.createdAt | date:'MMM d, y' }}</span>
+                              <span class="comment-date">{{ comment.createdAt | date:"MMM d, y" }}</span>
             </div>
             <p class="comment-text">{{ comment.content }}</p>
           </div>

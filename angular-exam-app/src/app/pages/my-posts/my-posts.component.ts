@@ -14,7 +14,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './my-posts.component.html',
-  styleUrls: ['./my-posts.component.css']
+  styleUrl: './my-posts.component.css'
 })
 export class MyPostsComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
@@ -71,22 +71,25 @@ export class MyPostsComponent implements OnInit, OnDestroy {
       });
   }
 
-  onSearchChange(searchTerm: string): void {
-    this.searchTerm = searchTerm;
+  onSearchChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.searchTerm = target.value;
     this.applyFilters();
   }
 
-  onFilterChange(filter: string): void {
-    this.selectedFilter = filter;
+  onFilterChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.selectedFilter = target.value;
     this.applyFilters();
   }
 
-  onSortChange(sortBy: string): void {
-    this.sortBy = sortBy;
+  onSortChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.sortBy = target.value;
     this.applyFilters();
   }
 
-  private applyFilters(): void {
+  applyFilters(): void {
     let filtered = [...this.posts];
 
     // Apply search filter

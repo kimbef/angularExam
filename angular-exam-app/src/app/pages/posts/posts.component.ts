@@ -14,7 +14,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './posts.component.html',
-  styleUrls: ['./posts.component.css']
+  styleUrl: './posts.component.css'
 })
 export class PostsComponent implements OnInit, OnDestroy {
   posts: Post[] = [];
@@ -77,9 +77,10 @@ export class PostsComponent implements OnInit, OnDestroy {
       });
   }
 
-  onSearchChange(searchTerm: string): void {
-    this.searchTerm = searchTerm;
-    this.searchSubject.next(searchTerm);
+  onSearchChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.searchTerm = target.value;
+    this.searchSubject.next(target.value);
   }
 
   onCategoryChange(category: string): void {

@@ -21,7 +21,7 @@
       </div>
       <div class="avatar-info">
         <h3>{{ currentUser?.firstName }} {{ currentUser?.lastName }}</h3>
-        <p>@{{ currentUser?.username }}</p>
+        <p>&#64;{{ currentUser?.username }}</p>
         <button class="btn btn-outline btn-sm">Change Avatar</button>
       </div>
     </div>
@@ -152,11 +152,11 @@
       <div class="info-grid">
         <div class="info-item">
           <label>Member Since</label>
-          <span>{{ currentUser?.createdAt | date:'MMMM d, y' }}</span>
+          <span>{{ currentUser?.createdAt | date:'longDate' }}</span>
         </div>
         <div class="info-item">
           <label>Last Updated</label>
-          <span>{{ currentUser?.updatedAt | date:'MMM d, y' }}</span>
+          <span>{{ currentUser?.updatedAt | date:'mediumDate' }}</span>
         </div>
         <div class="info-item">
           <label>Account Status</label>

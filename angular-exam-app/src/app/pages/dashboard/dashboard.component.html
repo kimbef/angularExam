@@ -114,7 +114,7 @@
               </h4>
               <p class="post-excerpt">{{ post.excerpt }}</p>
               <div class="post-meta">
-                <span class="post-date">{{ post.createdAt | date:'MMM d, y' }}</span>
+                <span class="post-date">{{ post.createdAt | date:"MMM d, y" }}</span>
                 <div class="post-stats">
                   <span class="stat">❤️ {{ post.likes }}</span>
                   <span class="stat">💬 {{ post.comments.length }}</span>
@@ -149,7 +149,7 @@
                 <strong>{{ post.author.username }}</strong> published
                 <a [routerLink]="['/posts', post.id]" class="activity-link">{{ post.title }}</a>
               </p>
-              <span class="activity-date">{{ post.createdAt | date:'MMM d, y' }}</span>
+              <span class="activity-date">{{ post.createdAt | date:"MMM d, y" }}</span>
             </div>
           </div>
         </div>

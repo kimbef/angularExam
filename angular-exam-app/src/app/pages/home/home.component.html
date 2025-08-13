@@ -63,7 +63,7 @@
               <img [src]="post.author.avatar" [alt]="post.author.username" class="author-avatar">
               <span class="author-name">{{ post.author.username }}</span>
             </div>
-            <span class="post-date">{{ post.createdAt | date:'MMM d, y' }}</span>
+            <span class="post-date">{{ post.createdAt | date:"MMM d, y" }}</span>
           </div>
           <h3 class="post-title">
             <a [routerLink]="['/posts', post.id]">{{ post.title }}</a>

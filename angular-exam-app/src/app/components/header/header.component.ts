@@ -11,7 +11,7 @@ import { User } from '../../models/user.interface';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './header.component.html',
-  styleUrls: ['./header.component.css']
+  styleUrl: './header.component.css'
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
