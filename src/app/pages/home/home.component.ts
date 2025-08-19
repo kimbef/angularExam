@@ -64,4 +64,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   retryLoad(): void {
     this.loadFeaturedPosts();
   }
+
+  getReadTime(content: string): number {
+    const wordsPerMinute = 200;
+    const wordCount = content.split(/\s+/).length;
+    return Math.ceil(wordCount / wordsPerMinute);
+  }
 }
