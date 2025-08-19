@@ -1,91 +1,112 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, throwError, from } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
+import { ref, push, set, get, remove, onValue, off, query, orderByChild, equalTo, update } from 'firebase/database';
 import { Post, CreatePostRequest, UpdatePostRequest, PostInteraction, Comment } from '../models/post.interface';
 import { AuthService } from './auth.service';
+import { FirebaseService } from './firebase.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PostService {
-  private readonly API_URL = 'https://jsonplaceholder.typicode.com';
   private postsSubject = new BehaviorSubject<Post[]>([]);
   private userPostsSubject = new BehaviorSubject<Post[]>([]);
+  private allPostsListener: any = null;
+  private userPostsListener: any = null;
 
   public posts$ = this.postsSubject.asObservable();
   public userPosts$ = this.userPostsSubject.asObservable();
 
   constructor(
-    private http: HttpClient,
-    private authService: AuthService
-  ) {}
+    private authService: AuthService,
+    private firebaseService: FirebaseService
+  ) {
+    this.initializeListeners();
+  }
+
+  private initializeListeners(): void {
+    this.authService.currentUser$.subscribe(user => {
+      if (user) {
+        this.setupAllPostsListener();
+        this.setupUserPostsListener(user.id);
+      } else {
+        this.removeListeners();
+      }
+    });
+  }
+
+  private setupAllPostsListener(): void {
+    const database = this.firebaseService.getDatabase();
+    const postsRef = ref(database, 'all-posts');
+    
+    this.allPostsListener = onValue(postsRef, (snapshot) => {
+      const posts: Post[] = [];
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.keys(data).forEach(key => {
+          const post = this.transformFirebasePost(key, data[key]);
+          if (post.isPublished) {
+            posts.push(post);
+          }
+        });
+        posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      this.postsSubject.next(posts);
+    });
+  }
+
+  private setupUserPostsListener(userId: string): void {
+    const database = this.firebaseService.getDatabase();
+    const userPostsRef = ref(database, `my-posts/${userId}`);
+    
+    this.userPostsListener = onValue(userPostsRef, (snapshot) => {
+      const posts: Post[] = [];
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.keys(data).forEach(key => {
+          posts.push(this.transformFirebasePost(key, data[key]));
+        });
+        posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      this.userPostsSubject.next(posts);
+    });
+  }
+
+  private removeListeners(): void {
+    if (this.allPostsListener) {
+      off(ref(this.firebaseService.getDatabase(), 'all-posts'), 'value', this.allPostsListener);
+      this.allPostsListener = null;
+    }
+    if (this.userPostsListener) {
+      off(ref(this.firebaseService.getDatabase(), 'my-posts'), 'value', this.userPostsListener);
+      this.userPostsListener = null;
+    }
+    this.postsSubject.next([]);
+    this.userPostsSubject.next([]);
+  }
 
   getAllPosts(): Observable<Post[]> {
-    return this.http.get<any[]>(`${this.API_URL}/posts`).pipe(
-      switchMap(posts => 
-        this.http.get<any[]>(`${this.API_URL}/users`).pipe(
-          map(users => {
-            const userMap = new Map(users.map(user => [user.id, user]));
-            
-            return posts.slice(0, 20).map(post => this.transformToPost(post, userMap.get(post.userId)));
-          })
-        )
-      ),
-      tap(posts => this.postsSubject.next(posts)),
-      catchError(this.handleError)
-    );
+    return this.posts$;
   }
 
   getPostById(id: string): Observable<Post> {
-    return this.http.get<any>(`${this.API_URL}/posts/${id}`).pipe(
-      switchMap(post => 
-        this.http.get<any>(`${this.API_URL}/users/${post.userId}`).pipe(
-          switchMap(user => 
-            this.http.get<any[]>(`${this.API_URL}/posts/${id}/comments`).pipe(
-              map(comments => {
-                const transformedPost = this.transformToPost(post, user);
-                transformedPost.comments = comments.map(comment => this.transformToComment(comment));
-                return transformedPost;
-              })
-            )
-          )
-        )
-      ),
+    const database = this.firebaseService.getDatabase();
+    const postRef = ref(database, `all-posts/${id}`);
+    
+    return from(get(postRef)).pipe(
+      map(snapshot => {
+        if (snapshot.exists()) {
+          return this.transformFirebasePost(id, snapshot.val());
+        }
+        throw new Error('Post not found');
+      }),
       catchError(this.handleError)
     );
   }
 
   getUserPosts(): Observable<Post[]> {
-    const currentUser = this.authService.getCurrentUser();
-    if (!currentUser) {
-      return throwError(() => new Error('User not authenticated'));
-    }
-
-    // Mock user posts - in real app, filter by actual user ID
-    return this.http.get<any[]>(`${this.API_URL}/posts`).pipe(
-      switchMap(posts => 
-        this.http.get<any[]>(`${this.API_URL}/users`).pipe(
-          map(users => {
-            const userMap = new Map(users.map(user => [user.id, user]));
-            
-            // Mock: take first 5 posts as user's posts
-            return posts.slice(0, 5).map(post => {
-              const transformedPost = this.transformToPost(post, userMap.get(post.userId));
-              // Override author to be current user
-              transformedPost.author = {
-                id: currentUser.id,
-                username: currentUser.username,
-                avatar: currentUser.avatar
-              };
-              return transformedPost;
-            });
-          })
-        )
-      ),
-      tap(posts => this.userPostsSubject.next(posts)),
-      catchError(this.handleError)
-    );
+    return this.userPosts$;
   }
 
   createPost(postData: CreatePostRequest): Observable<Post> {
@@ -94,9 +115,8 @@ export class PostService {
       return throwError(() => new Error('User not authenticated'));
     }
 
-    // Mock creation - in real app, this would POST to your backend
-    const mockPost: Post = {
-      id: Math.random().toString(36).substr(2, 9),
+    const database = this.firebaseService.getDatabase();
+    const newPost: Omit<Post, 'id'> = {
       title: postData.title,
       content: postData.content,
       excerpt: postData.excerpt,
@@ -109,6 +129,8 @@ export class PostService {
       tags: postData.tags,
       likes: 0,
       dislikes: 0,
+      likedBy: [],
+      dislikedBy: [],
       comments: [],
       imageUrl: postData.imageUrl,
       isPublished: postData.isPublished,
@@ -116,14 +138,25 @@ export class PostService {
       updatedAt: new Date()
     };
 
-    // Update local state
-    const currentPosts = this.userPostsSubject.value;
-    this.userPostsSubject.next([mockPost, ...currentPosts]);
+    // Create post in user's posts
+    const userPostsRef = ref(database, `my-posts/${currentUser.id}`);
+    const newUserPostRef = push(userPostsRef);
+    const postId = newUserPostRef.key!;
 
-    return new Observable(observer => {
-      observer.next(mockPost);
-      observer.complete();
-    });
+    const postWithId: Post = { ...newPost, id: postId };
+    
+    return from(set(newUserPostRef, this.transformPostForFirebase(postWithId))).pipe(
+      switchMap(() => {
+        // If published, also add to all-posts
+        if (postData.isPublished) {
+          const allPostsRef = ref(database, `all-posts/${postId}`);
+          return from(set(allPostsRef, this.transformPostForFirebase(postWithId)));
+        }
+        return from(Promise.resolve());
+      }),
+      map(() => postWithId),
+      catchError(this.handleError)
+    );
   }
 
   updatePost(postData: UpdatePostRequest): Observable<Post> {
@@ -132,27 +165,42 @@ export class PostService {
       return throwError(() => new Error('User not authenticated'));
     }
 
-    const currentPosts = this.userPostsSubject.value;
-    const postIndex = currentPosts.findIndex(p => p.id === postData.id);
+    const database = this.firebaseService.getDatabase();
+    const userPostRef = ref(database, `my-posts/${currentUser.id}/${postData.id}`);
     
-    if (postIndex === -1) {
-      return throwError(() => new Error('Post not found'));
-    }
+    return from(get(userPostRef)).pipe(
+      switchMap(snapshot => {
+        if (!snapshot.exists()) {
+          throw new Error('Post not found');
+        }
 
-    const updatedPost = {
-      ...currentPosts[postIndex],
-      ...postData,
-      updatedAt: new Date()
-    };
+        const existingPost = this.transformFirebasePost(postData.id!, snapshot.val());
+        const updatedPost: Post = {
+          ...existingPost,
+          ...postData,
+          updatedAt: new Date()
+        };
 
-    const updatedPosts = [...currentPosts];
-    updatedPosts[postIndex] = updatedPost;
-    this.userPostsSubject.next(updatedPosts);
-
-    return new Observable(observer => {
-      observer.next(updatedPost);
-      observer.complete();
-    });
+        const updateData = this.transformPostForFirebase(updatedPost);
+        
+        // Update in user's posts
+        return from(set(userPostRef, updateData)).pipe(
+          switchMap(() => {
+            // If published, also update in all-posts
+            if (updatedPost.isPublished) {
+              const allPostRef = ref(database, `all-posts/${postData.id}`);
+              return from(set(allPostRef, updateData));
+            } else {
+              // If unpublished, remove from all-posts
+              const allPostRef = ref(database, `all-posts/${postData.id}`);
+              return from(remove(allPostRef));
+            }
+          }),
+          map(() => updatedPost)
+        );
+      }),
+      catchError(this.handleError)
+    );
   }
 
   deletePost(postId: string): Observable<void> {
@@ -161,40 +209,83 @@ export class PostService {
       return throwError(() => new Error('User not authenticated'));
     }
 
-    const currentPosts = this.userPostsSubject.value;
-    const filteredPosts = currentPosts.filter(p => p.id !== postId);
-    this.userPostsSubject.next(filteredPosts);
+    const database = this.firebaseService.getDatabase();
+    const userPostRef = ref(database, `my-posts/${currentUser.id}/${postId}`);
+    const allPostRef = ref(database, `all-posts/${postId}`);
 
-    return new Observable(observer => {
-      observer.next();
-      observer.complete();
-    });
+    return from(remove(userPostRef)).pipe(
+      switchMap(() => from(remove(allPostRef))),
+      catchError(this.handleError)
+    );
   }
 
   interactWithPost(interaction: PostInteraction): Observable<Post> {
-    // Mock interaction - in real app, this would call your backend
-    const allPosts = this.postsSubject.value;
-    const postIndex = allPosts.findIndex(p => p.id === interaction.postId);
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
+    const database = this.firebaseService.getDatabase();
+    const postRef = ref(database, `all-posts/${interaction.postId}`);
     
-    if (postIndex === -1) {
-      return throwError(() => new Error('Post not found'));
-    }
+    return from(get(postRef)).pipe(
+      switchMap(snapshot => {
+        if (!snapshot.exists()) {
+          throw new Error('Post not found');
+        }
 
-    const updatedPost = { ...allPosts[postIndex] };
-    if (interaction.type === 'like') {
-      updatedPost.likes += 1;
-    } else {
-      updatedPost.dislikes += 1;
-    }
+        const existingPost = this.transformFirebasePost(interaction.postId, snapshot.val());
+        
+        // Check if user has already interacted
+        const hasLiked = existingPost.likedBy.includes(currentUser.id);
+        const hasDisliked = existingPost.dislikedBy.includes(currentUser.id);
+        
+        let updatedLikedBy = [...existingPost.likedBy];
+        let updatedDislikedBy = [...existingPost.dislikedBy];
+        
+        if (interaction.type === 'like') {
+          if (hasLiked) {
+            // Remove like
+            updatedLikedBy = updatedLikedBy.filter(id => id !== currentUser.id);
+          } else {
+            // Add like and remove dislike if exists
+            updatedLikedBy.push(currentUser.id);
+            updatedDislikedBy = updatedDislikedBy.filter(id => id !== currentUser.id);
+          }
+        } else {
+          if (hasDisliked) {
+            // Remove dislike
+            updatedDislikedBy = updatedDislikedBy.filter(id => id !== currentUser.id);
+          } else {
+            // Add dislike and remove like if exists
+            updatedDislikedBy.push(currentUser.id);
+            updatedLikedBy = updatedLikedBy.filter(id => id !== currentUser.id);
+          }
+        }
 
-    const updatedPosts = [...allPosts];
-    updatedPosts[postIndex] = updatedPost;
-    this.postsSubject.next(updatedPosts);
+        const updatedPost: Post = {
+          ...existingPost,
+          likes: updatedLikedBy.length,
+          dislikes: updatedDislikedBy.length,
+          likedBy: updatedLikedBy,
+          dislikedBy: updatedDislikedBy,
+          updatedAt: new Date()
+        };
 
-    return new Observable(observer => {
-      observer.next(updatedPost);
-      observer.complete();
-    });
+        const updateData = {
+          likes: updatedPost.likes,
+          dislikes: updatedPost.dislikes,
+          likedBy: updatedPost.likedBy,
+          dislikedBy: updatedPost.dislikedBy,
+          updatedAt: updatedPost.updatedAt.toISOString()
+        };
+
+        return from(update(postRef, updateData)).pipe(
+          map(() => updatedPost)
+        );
+      }),
+      catchError(this.handleError)
+    );
   }
 
   addComment(postId: string, content: string): Observable<Post> {
@@ -203,84 +294,130 @@ export class PostService {
       return throwError(() => new Error('User not authenticated'));
     }
 
-    const allPosts = this.postsSubject.value;
-    const postIndex = allPosts.findIndex(p => p.id === postId);
+    const database = this.firebaseService.getDatabase();
+    const postRef = ref(database, `all-posts/${postId}`);
     
-    if (postIndex === -1) {
-      return throwError(() => new Error('Post not found'));
-    }
+    return from(get(postRef)).pipe(
+      switchMap(snapshot => {
+        if (!snapshot.exists()) {
+          throw new Error('Post not found');
+        }
 
-    const newComment: Comment = {
-      id: Math.random().toString(36).substr(2, 9),
-      content: content,
-      author: {
-        id: currentUser.id,
-        username: currentUser.username,
-        avatar: currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`
-      },
-      postId: postId,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+        const existingPost = this.transformFirebasePost(postId, snapshot.val());
+        
+        const newComment: Comment = {
+          id: push(ref(database, 'temp')).key!,
+          content: content,
+          author: {
+            id: currentUser.id,
+            username: currentUser.username,
+            avatar: currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`
+          },
+          postId: postId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
 
-    const updatedPost = { ...allPosts[postIndex] };
-    updatedPost.comments = [...updatedPost.comments, newComment];
+        const updatedComments = [...existingPost.comments, newComment];
+        const updatedPost: Post = {
+          ...existingPost,
+          comments: updatedComments,
+          updatedAt: new Date()
+        };
 
-    const updatedPosts = [...allPosts];
-    updatedPosts[postIndex] = updatedPost;
-    this.postsSubject.next(updatedPosts);
+        const updateData = {
+          comments: updatedComments.map(comment => ({
+            id: comment.id,
+            content: comment.content,
+            author: comment.author,
+            postId: comment.postId,
+            createdAt: comment.createdAt.toISOString(),
+            updatedAt: comment.updatedAt.toISOString()
+          })),
+          updatedAt: updatedPost.updatedAt.toISOString()
+        };
 
-    return new Observable(observer => {
-      observer.next(updatedPost);
-      observer.complete();
-    });
+        return from(update(postRef, updateData)).pipe(
+          map(() => updatedPost)
+        );
+      }),
+      catchError(this.handleError)
+    );
   }
 
-  private transformToPost(apiPost: any, apiUser: any): Post {
+  canUserEditPost(post: Post): boolean {
+    const currentUser = this.authService.getCurrentUser();
+    return currentUser ? currentUser.id === post.author.id : false;
+  }
+
+  private transformFirebasePost(id: string, firebaseData: any): Post {
     return {
-      id: apiPost.id.toString(),
-      title: apiPost.title,
-      content: apiPost.body,
-      excerpt: apiPost.body.substring(0, 150) + '...',
-      author: {
-        id: apiUser.id.toString(),
-        username: apiUser.username,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${apiUser.username}`
-      },
-      category: 'General',
-      tags: ['blog', 'post'],
-      likes: Math.floor(Math.random() * 50),
-      dislikes: Math.floor(Math.random() * 10),
-      comments: [],
-      imageUrl: `https://picsum.photos/400/200?random=${apiPost.id}`,
-      isPublished: true,
-      createdAt: new Date(Date.now() - Math.random() * 10000000000),
-      updatedAt: new Date()
+      id,
+      title: firebaseData.title,
+      content: firebaseData.content,
+      excerpt: firebaseData.excerpt,
+      author: firebaseData.author,
+      category: firebaseData.category,
+      tags: firebaseData.tags || [],
+      likes: firebaseData.likes || 0,
+      dislikes: firebaseData.dislikes || 0,
+      likedBy: firebaseData.likedBy || [],
+      dislikedBy: firebaseData.dislikedBy || [],
+      comments: (firebaseData.comments || []).map((comment: any) => ({
+        ...comment,
+        createdAt: new Date(comment.createdAt),
+        updatedAt: new Date(comment.updatedAt)
+      })),
+      imageUrl: firebaseData.imageUrl,
+      isPublished: firebaseData.isPublished,
+      createdAt: new Date(firebaseData.createdAt),
+      updatedAt: new Date(firebaseData.updatedAt)
     };
   }
 
-  private transformToComment(apiComment: any): Comment {
+  private transformPostForFirebase(post: Post): any {
     return {
-      id: apiComment.id.toString(),
-      content: apiComment.body,
-      author: {
-        id: Math.random().toString(36).substr(2, 9),
-        username: apiComment.name.split(' ')[0].toLowerCase(),
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${apiComment.name}`
-      },
-      postId: apiComment.postId.toString(),
-      createdAt: new Date(Date.now() - Math.random() * 1000000000),
-      updatedAt: new Date()
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt,
+      author: post.author,
+      category: post.category,
+      tags: post.tags,
+      likes: post.likes,
+      dislikes: post.dislikes,
+      likedBy: post.likedBy,
+      dislikedBy: post.dislikedBy,
+      comments: post.comments.map(comment => ({
+        id: comment.id,
+        content: comment.content,
+        author: comment.author,
+        postId: comment.postId,
+        createdAt: comment.createdAt.toISOString(),
+        updatedAt: comment.updatedAt.toISOString()
+      })),
+      imageUrl: post.imageUrl,
+      isPublished: post.isPublished,
+      createdAt: post.createdAt.toISOString(),
+      updatedAt: post.updatedAt.toISOString()
     };
   }
 
-  private handleError(error: HttpErrorResponse): Observable<never> {
+  private handleError(error: any): Observable<never> {
     let errorMessage = 'An unknown error occurred!';
     
-    if (error.error instanceof ErrorEvent) {
-      errorMessage = `Error: ${error.error.message}`;
-    } else {
-      errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
+    if (error.code) {
+      switch (error.code) {
+        case 'permission-denied':
+          errorMessage = 'Permission denied. Please check your access rights.';
+          break;
+        case 'network-request-failed':
+          errorMessage = 'Network error. Please check your connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Database operation failed.';
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
     }
     
     return throwError(() => new Error(errorMessage));

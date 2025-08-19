@@ -1,59 +1,59 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { map, catchError, tap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, throwError, from, of } from 'rxjs';
+import { map, catchError, tap, switchMap } from 'rxjs/operators';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  updateProfile,
+  UserCredential,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { ref, set, get } from 'firebase/database';
 import { User, LoginRequest, RegisterRequest, AuthResponse } from '../models/user.interface';
+import { FirebaseService } from './firebase.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = 'https://jsonplaceholder.typicode.com'; // Mock API
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   private tokenSubject = new BehaviorSubject<string | null>(null);
 
   public currentUser$ = this.currentUserSubject.asObservable();
   public token$ = this.tokenSubject.asObservable();
 
-  constructor(private http: HttpClient) {
-    this.loadStoredAuth();
+  constructor(private firebaseService: FirebaseService) {
+    this.initAuthListener();
   }
 
-  private loadStoredAuth(): void {
-    const storedUser = localStorage.getItem('currentUser');
-    const storedToken = localStorage.getItem('authToken');
-    
-    if (storedUser && storedToken) {
-      this.currentUserSubject.next(JSON.parse(storedUser));
-      this.tokenSubject.next(storedToken);
-    }
+  private initAuthListener(): void {
+    const auth = this.firebaseService.getAuth();
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const user = await this.createUserFromFirebaseUser(firebaseUser);
+        const token = await firebaseUser.getIdToken();
+        this.currentUserSubject.next(user);
+        this.tokenSubject.next(token);
+      } else {
+        this.currentUserSubject.next(null);
+        this.tokenSubject.next(null);
+      }
+    });
   }
 
   login(credentials: LoginRequest): Observable<AuthResponse> {
-    // Mock login - in real app, this would call your backend
-    return this.http.get<any>(`${this.API_URL}/users/1`).pipe(
-      map(userData => {
-        const mockUser: User = {
-          id: userData.id.toString(),
-          email: credentials.email,
-          username: userData.username,
-          firstName: userData.name.split(' ')[0],
-          lastName: userData.name.split(' ')[1] || '',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-
-        const mockToken = `mock-jwt-token-${Date.now()}`;
-        const mockRefreshToken = `mock-refresh-token-${Date.now()}`;
-
+    const auth = this.firebaseService.getAuth();
+    return from(signInWithEmailAndPassword(auth, credentials.email, credentials.password)).pipe(
+      switchMap(async (userCredential: UserCredential) => {
+        const user = await this.createUserFromFirebaseUser(userCredential.user);
+        const token = await userCredential.user.getIdToken();
         const authResponse: AuthResponse = {
-          user: mockUser,
-          token: mockToken,
-          refreshToken: mockRefreshToken
+          user,
+          token,
+          refreshToken: token // Using the same token for simplicity
         };
-
-        this.setAuthData(authResponse);
         return authResponse;
       }),
       catchError(this.handleError)
@@ -61,11 +61,18 @@ export class AuthService {
   }
 
   register(userData: RegisterRequest): Observable<AuthResponse> {
-    // Mock registration - in real app, this would call your backend
-    return this.http.get<any>(`${this.API_URL}/users/1`).pipe(
-      map(() => {
-        const mockUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
+    const auth = this.firebaseService.getAuth();
+    const database = this.firebaseService.getDatabase();
+    
+    return from(createUserWithEmailAndPassword(auth, userData.email, userData.password)).pipe(
+      switchMap(async (userCredential: UserCredential) => {
+        // Update the user's display name
+        await updateProfile(userCredential.user, {
+          displayName: `${userData.firstName} ${userData.lastName}`
+        });
+
+        const user: User = {
+          id: userCredential.user.uid,
           email: userData.email,
           username: userData.username,
           firstName: userData.firstName,
@@ -75,28 +82,38 @@ export class AuthService {
           updatedAt: new Date()
         };
 
-        const mockToken = `mock-jwt-token-${Date.now()}`;
-        const mockRefreshToken = `mock-refresh-token-${Date.now()}`;
+        // Save user data to Realtime Database
+        await set(ref(database, `users/${userCredential.user.uid}`), {
+          email: userData.email,
+          username: userData.username,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          avatar: user.avatar,
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString()
+        });
 
+        const token = await userCredential.user.getIdToken();
         const authResponse: AuthResponse = {
-          user: mockUser,
-          token: mockToken,
-          refreshToken: mockRefreshToken
+          user,
+          token,
+          refreshToken: token
         };
-
-        this.setAuthData(authResponse);
         return authResponse;
       }),
       catchError(this.handleError)
     );
   }
 
-  logout(): void {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
-    this.currentUserSubject.next(null);
-    this.tokenSubject.next(null);
+  logout(): Observable<void> {
+    const auth = this.firebaseService.getAuth();
+    return from(signOut(auth)).pipe(
+      tap(() => {
+        this.currentUserSubject.next(null);
+        this.tokenSubject.next(null);
+      }),
+      catchError(this.handleError)
+    );
   }
 
   isAuthenticated(): boolean {
@@ -111,22 +128,67 @@ export class AuthService {
     return this.tokenSubject.value;
   }
 
-  private setAuthData(authResponse: AuthResponse): void {
-    localStorage.setItem('currentUser', JSON.stringify(authResponse.user));
-    localStorage.setItem('authToken', authResponse.token);
-    localStorage.setItem('refreshToken', authResponse.refreshToken);
+  private async createUserFromFirebaseUser(firebaseUser: FirebaseUser): Promise<User> {
+    const database = this.firebaseService.getDatabase();
+    const userRef = ref(database, `users/${firebaseUser.uid}`);
     
-    this.currentUserSubject.next(authResponse.user);
-    this.tokenSubject.next(authResponse.token);
+    try {
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        return {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          username: userData.username || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          avatar: userData.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
+          createdAt: new Date(userData.createdAt),
+          updatedAt: new Date(userData.updatedAt)
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+
+    // Fallback if user data doesn't exist in database
+    return {
+      id: firebaseUser.uid,
+      email: firebaseUser.email || '',
+      username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
+      firstName: firebaseUser.displayName?.split(' ')[0] || '',
+      lastName: firebaseUser.displayName?.split(' ')[1] || '',
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
-  private handleError(error: HttpErrorResponse): Observable<never> {
+  private handleError(error: any): Observable<never> {
     let errorMessage = 'An unknown error occurred!';
     
-    if (error.error instanceof ErrorEvent) {
-      errorMessage = `Error: ${error.error.message}`;
-    } else {
-      errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
+    if (error.code) {
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No user found with this email address.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password.';
+          break;
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password should be at least 6 characters.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address.';
+          break;
+        default:
+          errorMessage = error.message || 'Authentication failed.';
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
     }
     
     return throwError(() => new Error(errorMessage));

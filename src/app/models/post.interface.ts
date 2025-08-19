@@ -12,6 +12,8 @@ export interface Post {
   tags: string[];
   likes: number;
   dislikes: number;
+  likedBy: string[]; // User IDs who liked this post
+  dislikedBy: string[]; // User IDs who disliked this post
   comments: Comment[];
   imageUrl?: string;
   isPublished: boolean;
