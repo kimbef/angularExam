@@ -23,6 +23,7 @@ export class PostDetailComponent implements OnInit, OnDestroy {
   error: string | null = null;
   newComment = '';
   isSubmittingComment = false;
+  isPublishing = false;
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -157,5 +158,37 @@ export class PostDetailComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = null;
     this.ngOnInit();
+  }
+
+  isDraft(): boolean {
+    return this.post ? !this.post.isPublished : false;
+  }
+
+  isAuthor(): boolean {
+    return this.currentUser && this.post ? this.currentUser.id === this.post.author.id : false;
+  }
+
+  publishPost(): void {
+    if (!this.post || !this.isAuthor() || !this.isDraft()) {
+      return;
+    }
+
+    this.isPublishing = true;
+
+    this.postService.publishPost(this.post.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (publishedPost) => {
+          this.post = publishedPost;
+          this.isPublishing = false;
+          // Optionally show a success message
+          console.log('Post published successfully!');
+        },
+        error: (error) => {
+          console.error('Error publishing post:', error);
+          this.isPublishing = false;
+          // Optionally show error message
+        }
+      });
   }
 }

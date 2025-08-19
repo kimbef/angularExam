@@ -101,6 +101,9 @@
   gap: var(--space-16);
   align-items: center;
   width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
 }
 
 .hero-text {
@@ -149,7 +152,8 @@
 .hero-description {
   font-size: 1.25rem;
   line-height: 1.6;
-  color: var(--neutral-600);
+  color: var(--neutral-800);
+  font-weight: 500;
   margin-bottom: var(--space-8);
   animation: fadeInUp 0.6s ease-out 0.2s both;
 }
@@ -179,8 +183,8 @@
 
 .stat-label {
   font-size: 0.875rem;
-  color: var(--neutral-500);
-  font-weight: 500;
+  color: var(--neutral-700);
+  font-weight: 600;
 }
 
 .stat-divider {
@@ -396,7 +400,8 @@
 
 .section-description {
   font-size: 1.125rem;
-  color: var(--neutral-600);
+  color: var(--neutral-700);
+  font-weight: 500;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -501,9 +506,10 @@
 
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
   gap: var(--space-8);
   margin-bottom: var(--space-12);
+  width: 100%;
 }
 
 .modern-post-card {
@@ -745,8 +751,9 @@
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-8);
+  width: 100%;
 }
 
 .feature-card {

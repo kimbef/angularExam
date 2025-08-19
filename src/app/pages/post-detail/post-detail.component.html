@@ -87,13 +87,40 @@
 
     <!-- Post Actions -->
     <div class="post-actions">
+      <!-- Draft Warning and Publish Button -->
+      <div *ngIf="isDraft() && isAuthor()" class="draft-warning">
+        <div class="draft-notice">
+          <svg fill="currentColor" viewBox="0 0 20 20" class="draft-icon">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+          </svg>
+          <span>This is a draft post - only you can see it</span>
+        </div>
+        <button
+          class="btn btn-primary publish-btn"
+          (click)="publishPost()"
+          [disabled]="isPublishing"
+          [class.loading]="isPublishing"
+        >
+          <span *ngIf="!isPublishing">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="publish-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Publish Post
+          </span>
+          <span *ngIf="isPublishing" class="loading-content">
+            <div class="spinner"></div>
+            Publishing...
+          </span>
+        </button>
+      </div>
+
       <div class="interaction-buttons">
         <button
           class="action-btn like-btn"
-          [class.disabled]="!currentUser"
-          [disabled]="!currentUser"
+          [class.disabled]="!currentUser || isDraft()"
+          [disabled]="!currentUser || isDraft()"
           (click)="likePost()"
-          [title]="currentUser ? 'Like this post' : 'Login to like posts'"
+          [title]="isDraft() ? 'Publish to enable interactions' : (currentUser ? 'Like this post' : 'Login to like posts')"
         >
           <svg fill="currentColor" viewBox="0 0 20 20" class="action-icon">
             <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
@@ -103,10 +130,10 @@
 
         <button
           class="action-btn dislike-btn"
-          [class.disabled]="!currentUser"
-          [disabled]="!currentUser"
+          [class.disabled]="!currentUser || isDraft()"
+          [disabled]="!currentUser || isDraft()"
           (click)="dislikePost()"
-          [title]="currentUser ? 'Dislike this post' : 'Login to dislike posts'"
+          [title]="isDraft() ? 'Publish to enable interactions' : (currentUser ? 'Dislike this post' : 'Login to dislike posts')"
         >
           <svg fill="currentColor" viewBox="0 0 20 20" class="action-icon">
             <path fill-rule="evenodd" d="M18.707 8.707a1 1 0 00-1.414-1.414L10 14.586 2.707 7.293a1 1 0 00-1.414 1.414l8 8a1 1 0 001.414 0l8-8z" clip-rule="evenodd"></path>
@@ -143,11 +170,15 @@
         Comments ({{ post.comments.length }})
       </h3>
 
-      <div *ngIf="!currentUser" class="login-prompt">
+      <div *ngIf="isDraft()" class="draft-comments-disabled">
+        <p>Comments are disabled for draft posts. Publish this post to enable comments.</p>
+      </div>
+
+      <div *ngIf="!isDraft() && !currentUser" class="login-prompt">
         <p>Please <a routerLink="/login" class="login-link">login</a> to leave a comment.</p>
       </div>
 
-      <div *ngIf="post.comments.length === 0" class="no-comments">
+      <div *ngIf="!isDraft() && post.comments.length === 0" class="no-comments">
         <p>No comments yet. Be the first to share your thoughts!</p>
       </div>
 
@@ -167,7 +198,7 @@
       </div>
 
       <!-- Add Comment Form -->
-      <div *ngIf="currentUser" class="add-comment-section">
+      <div *ngIf="!isDraft() && currentUser" class="add-comment-section">
         <h4>Add a Comment</h4>
         <form (ngSubmit)="submitComment()" class="comment-form">
           <div class="form-group">

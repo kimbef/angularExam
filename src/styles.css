@@ -204,6 +204,13 @@ a:hover {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--space-6);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-container {
+  padding-top: 100px; /* Account for fixed header */
+  min-height: 100vh;
 }
 
 .card {

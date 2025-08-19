@@ -31,11 +31,19 @@ export class AuthService {
   private initAuthListener(): void {
     const auth = this.firebaseService.getAuth();
     onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
       if (firebaseUser) {
-        const user = await this.createUserFromFirebaseUser(firebaseUser);
-        const token = await firebaseUser.getIdToken();
-        this.currentUserSubject.next(user);
-        this.tokenSubject.next(token);
+        try {
+          const user = await this.createUserFromFirebaseUser(firebaseUser);
+          const token = await firebaseUser.getIdToken();
+          console.log('User data loaded:', user);
+          this.currentUserSubject.next(user);
+          this.tokenSubject.next(token);
+        } catch (error) {
+          console.error('Error loading user data:', error);
+          this.currentUserSubject.next(null);
+          this.tokenSubject.next(null);
+        }
       } else {
         this.currentUserSubject.next(null);
         this.tokenSubject.next(null);

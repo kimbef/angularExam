@@ -1,7 +1,7 @@
 .posts-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 120px 1rem 2rem 1rem; /* Top padding to account for fixed header */
   min-height: 100vh;
 }
 
@@ -278,6 +278,7 @@
   margin-bottom: 1rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

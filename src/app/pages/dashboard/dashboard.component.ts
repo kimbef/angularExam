@@ -24,8 +24,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   stats = {
     totalPosts: 0,
     totalLikes: 0,
-    totalComments: 0,
-    totalViews: 0
+    totalComments: 0
   };
   private destroy$ = new Subject<void>();
 
@@ -59,6 +58,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (posts) => {
+          console.log('User posts loaded:', posts);
           this.userPosts = posts;
           this.calculateStats(posts);
           this.isLoading = false;
@@ -75,7 +75,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (posts) => {
+          console.log('All posts loaded:', posts);
           this.recentPosts = posts.slice(0, 5); // Show 5 most recent posts
+          console.log('Recent posts (first 5):', this.recentPosts);
         },
         error: (error) => {
           console.error('Error loading recent posts:', error);
@@ -87,7 +89,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.stats.totalPosts = posts.length;
     this.stats.totalLikes = posts.reduce((sum, post) => sum + post.likes, 0);
     this.stats.totalComments = posts.reduce((sum, post) => sum + post.comments.length, 0);
-    this.stats.totalViews = Math.floor(Math.random() * 1000) + posts.length * 50; // Mock views
+    console.log('Stats calculated:', this.stats, 'from posts:', posts);
   }
 
   retryLoad(): void {
@@ -96,5 +98,49 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   trackByPostId(index: number, post: Post): string {
     return post.id;
+  }
+
+  // Like/Unlike functionality
+  toggleLike(post: Post, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (!this.currentUser) {
+      return;
+    }
+
+    this.postService.interactWithPost({
+      postId: post.id,
+      type: 'like'
+    }).pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (updatedPost) => {
+        // Update the post in recentPosts array
+        const recentIndex = this.recentPosts.findIndex(p => p.id === post.id);
+        if (recentIndex !== -1) {
+          this.recentPosts[recentIndex] = updatedPost;
+        }
+        
+        // Update the post in userPosts array if it's user's own post
+        const userIndex = this.userPosts.findIndex(p => p.id === post.id);
+        if (userIndex !== -1) {
+          this.userPosts[userIndex] = updatedPost;
+          this.calculateStats(this.userPosts);
+        }
+      },
+      error: (error) => {
+        console.error('Error toggling like:', error);
+      }
+    });
+  }
+
+  // Check if current user has liked the post
+  hasUserLiked(post: Post): boolean {
+    return this.currentUser ? post.likedBy.includes(this.currentUser.id) : false;
+  }
+
+  // Check if user can edit this post (is the author)
+  canEditPost(post: Post): boolean {
+    return this.currentUser ? post.author.id === this.currentUser.id : false;
   }
 }

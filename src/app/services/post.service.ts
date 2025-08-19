@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, throwError, from } from 'rxjs';
+import { BehaviorSubject, Observable, throwError, from, of } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { ref, push, set, get, remove, onValue, off, query, orderByChild, equalTo, update } from 'firebase/database';
 import { Post, CreatePostRequest, UpdatePostRequest, PostInteraction, Comment } from '../models/post.interface';
@@ -60,13 +60,40 @@ export class PostService {
     const database = this.firebaseService.getDatabase();
     const userPostsRef = ref(database, `my-posts/${userId}`);
     
-    this.userPostsListener = onValue(userPostsRef, (snapshot) => {
+    this.userPostsListener = onValue(userPostsRef, async (snapshot) => {
       const posts: Post[] = [];
       if (snapshot.exists()) {
         const data = snapshot.val();
-        Object.keys(data).forEach(key => {
-          posts.push(this.transformFirebasePost(key, data[key]));
-        });
+        
+        // Process each post and sync with all-posts if published
+        for (const key of Object.keys(data)) {
+          let postData = data[key];
+          
+          // If post is published, get the latest data from all-posts
+          if (postData.isPublished) {
+            try {
+              const allPostRef = ref(database, `all-posts/${key}`);
+              const allPostSnapshot = await get(allPostRef);
+              if (allPostSnapshot.exists()) {
+                const allPostData = allPostSnapshot.val();
+                // Merge the data, prioritizing interaction counts from all-posts
+                postData = {
+                  ...postData,
+                  likes: allPostData.likes || 0,
+                  dislikes: allPostData.dislikes || 0,
+                  likedBy: allPostData.likedBy || [],
+                  dislikedBy: allPostData.dislikedBy || [],
+                  comments: allPostData.comments || []
+                };
+              }
+            } catch (error) {
+              console.warn('Could not sync post data from all-posts:', error);
+            }
+          }
+          
+          posts.push(this.transformFirebasePost(key, postData));
+        }
+        
         posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
       this.userPostsSubject.next(posts);
@@ -95,11 +122,27 @@ export class PostService {
     const postRef = ref(database, `all-posts/${id}`);
     
     return from(get(postRef)).pipe(
-      map(snapshot => {
+      switchMap(snapshot => {
         if (snapshot.exists()) {
-          return this.transformFirebasePost(id, snapshot.val());
+          // Post found in all-posts (published post)
+          return of(this.transformFirebasePost(id, snapshot.val()));
         }
-        throw new Error('Post not found');
+        
+        // Post not found in all-posts, check if it's a draft in my-posts
+        const currentUser = this.authService.getCurrentUser();
+        if (!currentUser) {
+          throw new Error('Post not found');
+        }
+        
+        const userPostRef = ref(database, `my-posts/${currentUser.id}/${id}`);
+        return from(get(userPostRef)).pipe(
+          map(userSnapshot => {
+            if (userSnapshot.exists()) {
+              return this.transformFirebasePost(id, userSnapshot.val());
+            }
+            throw new Error('Post not found');
+          })
+        );
       }),
       catchError(this.handleError)
     );
@@ -281,6 +324,12 @@ export class PostService {
         };
 
         return from(update(postRef, updateData)).pipe(
+          switchMap(() => {
+            // Also update the post in the author's my-posts collection
+            const authorId = existingPost.author.id;
+            const userPostRef = ref(database, `my-posts/${authorId}/${interaction.postId}`);
+            return from(update(userPostRef, updateData));
+          }),
           map(() => updatedPost)
         );
       }),
@@ -348,6 +397,56 @@ export class PostService {
   canUserEditPost(post: Post): boolean {
     const currentUser = this.authService.getCurrentUser();
     return currentUser ? currentUser.id === post.author.id : false;
+  }
+
+  publishPost(postId: string): Observable<Post> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
+    const database = this.firebaseService.getDatabase();
+    const userPostRef = ref(database, `my-posts/${currentUser.id}/${postId}`);
+    
+    return from(get(userPostRef)).pipe(
+      switchMap(snapshot => {
+        if (!snapshot.exists()) {
+          throw new Error('Draft post not found');
+        }
+
+        const draftPost = this.transformFirebasePost(postId, snapshot.val());
+        
+        // Ensure the current user is the author
+        if (draftPost.author.id !== currentUser.id) {
+          throw new Error('Not authorized to publish this post');
+        }
+
+        // Update the draft to published
+        const publishedPost: Post = {
+          ...draftPost,
+          isPublished: true,
+          updatedAt: new Date()
+        };
+
+        const postData = this.transformPostForFirebase(publishedPost);
+
+        // Update in user's my-posts
+        const userPostUpdate = from(update(userPostRef, { 
+          isPublished: true, 
+          updatedAt: publishedPost.updatedAt.toISOString() 
+        }));
+
+        // Add to all-posts
+        const allPostsRef = ref(database, `all-posts/${postId}`);
+        const allPostsUpdate = from(set(allPostsRef, postData));
+
+        // Execute both updates
+        return from(Promise.all([userPostUpdate, allPostsUpdate])).pipe(
+          map(() => publishedPost)
+        );
+      }),
+      catchError(this.handleError)
+    );
   }
 
   private transformFirebasePost(id: string, firebaseData: any): Post {

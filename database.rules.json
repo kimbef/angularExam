@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "all-posts": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "my-posts": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}
