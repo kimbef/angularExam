@@ -55,6 +55,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
     });
   }
 
+
+
   closeMenu(): void {
     this.isMenuOpen = false;
   }

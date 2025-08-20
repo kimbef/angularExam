@@ -345,6 +345,15 @@
   color: var(--error);
 }
 
+.dropdown-link.delete-account-link {
+  color: var(--error);
+}
+
+.dropdown-link.delete-account-link:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+
 .dropdown-icon {
   width: 18px;
   height: 18px;

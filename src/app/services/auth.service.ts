@@ -7,6 +7,7 @@ import {
   signOut, 
   onAuthStateChanged,
   updateProfile,
+  deleteUser,
   UserCredential,
   User as FirebaseUser
 } from 'firebase/auth';
@@ -119,6 +120,27 @@ export class AuthService {
       tap(() => {
         this.currentUserSubject.next(null);
         this.tokenSubject.next(null);
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  deleteAccount(): Observable<void> {
+    const auth = this.firebaseService.getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      return throwError(() => new Error('No user is currently signed in'));
+    }
+
+    return from(deleteUser(currentUser)).pipe(
+      tap(() => {
+        // Clear local state
+        this.currentUserSubject.next(null);
+        this.tokenSubject.next(null);
+        
+        // Navigate to home page
+        // Note: We'll handle navigation in the component
       }),
       catchError(this.handleError)
     );

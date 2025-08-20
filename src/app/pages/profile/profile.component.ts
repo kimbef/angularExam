@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil, finalize } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
@@ -25,7 +25,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {
     this.profileForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
@@ -112,6 +113,20 @@ export class ProfileComponent implements OnInit, OnDestroy {
       email: 'Email'
     };
     return displayNames[fieldName] || fieldName;
+  }
+
+  deleteAccount(): void {
+    if (confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your data.')) {
+      this.authService.deleteAccount().subscribe({
+        next: () => {
+          this.router.navigate(['/']);
+        },
+        error: (error) => {
+          console.error('Delete account error:', error);
+          alert('Failed to delete account. Please try again.');
+        }
+      });
+    }
   }
 
   private markFormGroupTouched(): void {

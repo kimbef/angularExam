@@ -1,8 +1,10 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
-import { Observable } from 'rxjs';
-import { map, take } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { map, take, switchMap, filter } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+import { FirebaseService } from '../services/firebase.service';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 @Injectable({
   providedIn: 'root'
@@ -10,20 +12,29 @@ import { AuthService } from '../services/auth.service';
 export class GuestGuard implements CanActivate {
   constructor(
     private authService: AuthService,
+    private firebaseService: FirebaseService,
     private router: Router
   ) {}
 
   canActivate(): Observable<boolean> {
-    return this.authService.currentUser$.pipe(
-      take(1),
-      map(user => {
-        if (!user) {
-          return true;
+    const auth = this.firebaseService.getAuth();
+    
+    // Wait for Firebase auth state to be initialized
+    return new Observable<boolean>(observer => {
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+        unsubscribe(); // Unsubscribe after first auth state check
+        
+        if (!firebaseUser) {
+          // No user logged in, allow access to login/register
+          observer.next(true);
+          observer.complete();
         } else {
+          // User is logged in, redirect to dashboard
           this.router.navigate(['/dashboard']);
-          return false;
+          observer.next(false);
+          observer.complete();
         }
-      })
-    );
+      });
+    });
   }
 }
